@@ -1,9 +1,13 @@
 import telebot
 from telebot import types
 from main import search_vacancies, get_area_id_by_name
+from dotenv import load_dotenv
+import os
 
-TOKEN = '7328993536:AAFwblVwEO4okkV5oocJOK9vQPb8ysMij1A'
-bot = telebot.TeleBot(TOKEN)
+load_dotenv()
+bot_token = os.getenv("TOKEN")
+
+bot = telebot.TeleBot(bot_token)
 
 user_data = {}
 
@@ -112,4 +116,3 @@ def next_page(call):
 if __name__ == '__main__':
     bot.remove_webhook()
     bot.polling(none_stop=True)
-
