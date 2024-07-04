@@ -1,5 +1,7 @@
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from db import Session, get_db, Vacancy
+
 app = FastAPI()
 
 def get_area_id_by_name(area_name):
@@ -30,10 +32,23 @@ def search_vacancies(query, area=1, page=0, per_page=20, experience='noExperienc
     response = requests.get(url, params=params)
     return response.json()
 
+def add_database(vacancy, session):
+    session.add(Vacancy(
+        id= vacancy['id'],
+        name=vacancy['name'],
+        experience=vacancy['experience']['name'],
+        employer=vacancy['employer']['name'],
+        employment=vacancy['employment']['name'],
+        salary=vacancy['salary']['from'] if vacancy['salary']['from'] else vacancy['salary']['to'],
+        area=vacancy['area']['name']
+    ))
+    session.commit()
 @app.get("/search/")
-def search(query: str, area: int = 1, page: int = 0, per_page: int = 20, experience='noExperience', salary=None, employment=None):
+def search(query: str, area: int = 1, page: int = 0, per_page: int = 20, experience='noExperience', salary=None, employment=None, db: Session = Depends(get_db)):
     vacancies = search_vacancies(query, area, page, per_page, experience, salary, employment, only_with_salary=True)
-    if vacancies:
+    if vacancies['items']:
+        for vacancy in vacancies['items']:
+            add_database(vacancy, db)
         return vacancies
     else:
         return {"error": "An error occurred while fetching vacancies"}

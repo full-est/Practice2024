@@ -1,22 +1,42 @@
 import telebot
+from config import TOKEN
 from telebot import types
 from main import search_vacancies, get_area_id_by_name
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-bot_token = os.getenv("TOKEN")
 
-bot = telebot.TeleBot(bot_token)
+bot = telebot.TeleBot(TOKEN)
+
+bot.set_my_commands([
+    telebot.types.BotCommand("start", "Начать работу с ботом")
+])
 
 user_data = {}
 
-start_message = "Привет! Я могу помочь вам найти вакансии. Пожалуйста, укажите ваш город:"
+def create_main_menu():
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    button_search = types.KeyboardButton("Начать поиск вакансий")
+    button_cancel = types.KeyboardButton("Отмена поиска")
+    keyboard.add(button_search, button_cancel)
+    return keyboard
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, start_message)
-    user_data[message.chat.id] = {'state': 'WAITING_FOR_CITY'}
+    keyboard = create_main_menu()
+    bot.send_message(message.chat.id, "Привет! Я могу помочь вам найти вакансии. Выберите действие:", reply_markup=keyboard)
+    user_data[message.chat.id] = {'state': 'START'}
+
+@bot.message_handler(func=lambda message: message.text == "Отмена поиска")
+def cancel_search(message):
+    user_data.pop(message.chat.id, None)
+    keyboard = create_main_menu()
+    bot.send_message(message.chat.id, "Поиск отменен. Выберите действие:", reply_markup=keyboard)
+    user_data[message.chat.id] = {'state': 'START'}
+
+@bot.message_handler(func=lambda message: message.text == "Начать поиск вакансий")
+def handle_start_search(message):
+        bot.send_message(message.chat.id, "Введите название города:")
+        user_data[message.chat.id]['state'] = 'WAITING_FOR_CITY'
+
 
 @bot.message_handler(func=lambda message: user_data.get(message.chat.id, {}).get('state') == 'WAITING_FOR_CITY')
 def handle_city(message):
@@ -72,7 +92,7 @@ def send_employment_buttons(chat_id):
 @bot.callback_query_handler(func=lambda call: call.data in ['full', 'part', 'project', 'volunteer', 'probation'])
 def handle_employment(call):
     user_data[call.message.chat.id]['employment'] = call.data
-    user_data[call.message.chat.id]['page'] = 0  # Начинаем с первой страницы
+    user_data[call.message.chat.id]['page'] = 0
     data = user_data[call.message.chat.id]
     send_vacancies(call.message.chat.id, data)
 
