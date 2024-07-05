@@ -26,20 +26,30 @@ def create_filter_menu():
     button_city = types.InlineKeyboardButton("Фильтр по городу", callback_data="filter_city")
     button_experience = types.InlineKeyboardButton("Фильтр по опыту", callback_data="filter_experience")
     button_employment = types.InlineKeyboardButton("Фильтр по типу занятости", callback_data="filter_employment")
-    button_next_page = (types.InlineKeyboardButton("Следующая страница", callback_data='next_page'))
-    keyboard.add(button_city, button_experience, button_employment, button_next_page)
+    keyboard.add(button_city, button_experience, button_employment)
     return keyboard
 def create_experience_menu():
     keyboard = types.InlineKeyboardMarkup()
-    experiences = ["Нет опыта", "1-3 года", "3-6 лет", "Более 6 лет"]  # Добавьте необходимые опыты
-    for experience in experiences:
-        keyboard.add(types.InlineKeyboardButton(experience, callback_data=f"experience_{experience}"))
+    experiences = {
+        "Нет опыта": "Нет опыта",
+        "От 1 года до 3 лет": "От 1 года до 3 лет",
+        "От 3 до 6 лет": "От 3 до 6 лет",
+        "Более 6 лет": "Более 6 лет"
+    }
+    for label, value in experiences.items():
+        keyboard.add(types.InlineKeyboardButton(label, callback_data=f"experience_{value}"))
     return keyboard
 def create_employment_menu():
     keyboard = types.InlineKeyboardMarkup()
-    employments = ["Полная занятость", "Частичная занятость", "Проектная работа", "Волонтерство", "Стажировка"]
-    for employment in employments:
-        keyboard.add(types.InlineKeyboardButton(employment, callback_data=f"employment_{employment}"))
+    employments = {
+        "Полная занятость": "Полная занятость",
+        "Частичная занятость": "Частичная занятость",
+        "Проектная работа": "Проектная работа",
+        "Волонтерство": "Волонтерство",
+        "Стажировка": "Стажировка"
+                   }
+    for label, value in employments.items():
+        keyboard.add(types.InlineKeyboardButton(label, callback_data=f"employment_{value}"))
     return keyboard
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -64,7 +74,6 @@ def show_vacancies_by_name(message):
     user_data[message.chat.id]['state'] = 'WAITING_FOR_SORT'
     profession = message.text
     user_data[message.chat.id]['profession'] = profession
-    user_data[message.chat.id]['page'] = 0  # Инициализируем номер страницы
     send_vacancies_db(message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('filter_'))
@@ -78,10 +87,6 @@ def handle_filter_choice(call):
     elif call.data == 'filter_employment':
         bot.send_message(call.message.chat.id, "Выберите тип занятости:", reply_markup=create_employment_menu())
         user_data[call.message.chat.id]['state'] = 'WAITING_FOR_EMPLOYMENT_DB'
-    elif call.data == 'next_page':
-        user_data[call.message.chat.id]['page'] += 1
-        send_vacancies_db(call.message.chat.id)
-
 
 @bot.message_handler(func=lambda message: user_data.get(message.chat.id, {}).get('state') == 'WAITING_FOR_CITY_DB')
 def handle_city_input(message):
@@ -96,6 +101,7 @@ def handle_experience_choice(call):
     user_data[call.message.chat.id]['experience'] = experience
     bot.send_message(call.message.chat.id, f"Вы выбрали опыт работы: {experience}")
     send_vacancies_db(call.message.chat.id)
+    print(user_data)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('employment_'))
@@ -112,9 +118,8 @@ def send_vacancies_db(chat_id):
     city = data.get('city')
     experience = data.get('experience')
     employment = data.get('employment')
-    page = data.get('page', 0)
 
-    params = {"name": profession, "page": page}
+    params = {"name": profession}
     if city:
         params["area"] = city
     if experience:
@@ -134,7 +139,9 @@ def send_vacancies_db(chat_id):
             bot.send_message(chat_id, "Выберите дальнейшие действия:", reply_markup=create_filter_menu())
         else:
             bot.send_message(chat_id, "Вакансий с таким названием не найдено.")
-
+    print(user_data)
+    print(data)
+    print(params)
 @bot.message_handler(func=lambda message: message.text == "Начать поиск вакансий с сайта hh.ru")
 def handle_start_search(message):
         bot.send_message(message.chat.id, "Введите название города:")

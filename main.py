@@ -57,7 +57,7 @@ def search(query: str, area: int = 1, page: int = 0, per_page: int = 20, experie
         return {"error": "An error occurred while fetching vacancies"}
 
 @app.get("/vacancies/")
-def search_vacancies_by_name(name: str, area: str = None, experience: str = None, employment: str = None, page: int = 0, per_page: int = 20, db: Session = Depends(get_db)):
+def search_vacancies_by_name(name: str, area: str = None, experience: str = None, employment: str = None, db: Session = Depends(get_db)):
     query = db.query(Vacancy)
     if name:
         query = query.filter(func.lower(Vacancy.name).contains(func.lower(name)))
@@ -68,7 +68,7 @@ def search_vacancies_by_name(name: str, area: str = None, experience: str = None
     if employment:
         query = query.filter(func.lower(Vacancy.employment) == func.lower(employment))
 
-    return query.offset(page * per_page).limit(per_page).all()
+    return query.all()
 @app.get("/vacancies/search_by_salary/")
 def get_vacancies(sort_by: str = "salary", order: str = "desc", db: Session = Depends(get_db)):
     query = db.query(Vacancy).all()
