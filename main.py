@@ -1,5 +1,6 @@
 import requests
 from fastapi import FastAPI, Depends
+from sqlalchemy import func
 from db import Session, get_db, Vacancy
 
 app = FastAPI()
@@ -33,7 +34,9 @@ def search_vacancies(query, area=1, page=0, per_page=20, experience='noExperienc
     return response.json()
 
 def add_database(vacancy, session):
-    session.add(Vacancy(
+    existing_vacancy = session.query(Vacancy).filter_by(id=vacancy['id']).first()
+    if not existing_vacancy:
+        session.add(Vacancy(
         id= vacancy['id'],
         name=vacancy['name'],
         experience=vacancy['experience']['name'],
@@ -52,3 +55,24 @@ def search(query: str, area: int = 1, page: int = 0, per_page: int = 20, experie
         return vacancies
     else:
         return {"error": "An error occurred while fetching vacancies"}
+
+@app.get("/vacancies/")
+def search_vacancies_by_name(name: str, area: str = None, experience: str = None, employment: str = None, page: int = 0, per_page: int = 20, db: Session = Depends(get_db)):
+    query = db.query(Vacancy)
+    if name:
+        query = query.filter(func.lower(Vacancy.name).contains(func.lower(name)))
+    if area:
+        query = query.filter(func.lower(Vacancy.area) == func.lower(area))
+    if experience:
+        query = query.filter(func.lower(Vacancy.experience) == func.lower(experience))
+    if employment:
+        query = query.filter(func.lower(Vacancy.employment) == func.lower(employment))
+
+    return query.offset(page * per_page).limit(per_page).all()
+@app.get("/vacancies/search_by_salary/")
+def get_vacancies(sort_by: str = "salary", order: str = "desc", db: Session = Depends(get_db)):
+    query = db.query(Vacancy).all()
+    if sort_by == "salary":
+        if order == "asc":
+            return sorted(query, key=lambda x: int(x.salary))
+    return sorted(query, key=lambda x: int(x.salary), reverse=True)
