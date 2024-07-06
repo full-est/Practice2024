@@ -101,7 +101,6 @@ def handle_experience_choice(call):
     user_data[call.message.chat.id]['experience'] = experience
     bot.send_message(call.message.chat.id, f"Вы выбрали опыт работы: {experience}")
     send_vacancies_db(call.message.chat.id)
-    print(user_data)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('employment_'))
@@ -139,9 +138,7 @@ def send_vacancies_db(chat_id):
             bot.send_message(chat_id, "Выберите дальнейшие действия:", reply_markup=create_filter_menu())
         else:
             bot.send_message(chat_id, "Вакансий с таким названием не найдено.")
-    print(user_data)
-    print(data)
-    print(params)
+
 @bot.message_handler(func=lambda message: message.text == "Начать поиск вакансий с сайта hh.ru")
 def handle_start_search(message):
         bot.send_message(message.chat.id, "Введите название города:")
