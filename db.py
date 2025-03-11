@@ -28,4 +28,5 @@ class Vacancy(Base):
     area = Column(String)
 
 
-Base.metadata.create_all(engine)
+Base.metadata.create_all(engine, checkfirst=True)
+

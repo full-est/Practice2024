@@ -2,62 +2,26 @@ import telebot
 import requests
 from config import TOKEN
 from telebot import types
-from main import get_area_id_by_name
+from keyboards import create_main_menu, create_experience_menu, create_employment_menu, create_filter_menu
+from vacancies import get_area_id_by_name
 
 bot = telebot.TeleBot(TOKEN)
 
 bot.set_my_commands([
     telebot.types.BotCommand("start", "Начать поиск вакансий"),
-    telebot.types.BotCommand("get_all", "Получить все вакансии из базы данных с сортировкой по зарплате")
+    telebot.types.BotCommand("get_all", "Получить все вакансии из базы данных с сортировкой по зарплате"),
+    telebot.types.BotCommand("cancel", "Отмена поиска")
 ])
 
 user_data = {}
 
-def create_main_menu():
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button_search = types.KeyboardButton("Начать поиск вакансий с сайта hh.ru")
-    button_search_in_db = types.KeyboardButton("Вакансии из базы данных")
-    button_cancel = types.KeyboardButton("Отмена поиска")
-    keyboard.add(button_search, button_search_in_db, button_cancel)
-    return keyboard
-
-def create_filter_menu():
-    keyboard = types.InlineKeyboardMarkup()
-    button_city = types.InlineKeyboardButton("Фильтр по городу", callback_data="filter_city")
-    button_experience = types.InlineKeyboardButton("Фильтр по опыту", callback_data="filter_experience")
-    button_employment = types.InlineKeyboardButton("Фильтр по типу занятости", callback_data="filter_employment")
-    keyboard.add(button_city, button_experience, button_employment)
-    return keyboard
-def create_experience_menu():
-    keyboard = types.InlineKeyboardMarkup()
-    experiences = {
-        "Нет опыта": "Нет опыта",
-        "От 1 года до 3 лет": "От 1 года до 3 лет",
-        "От 3 до 6 лет": "От 3 до 6 лет",
-        "Более 6 лет": "Более 6 лет"
-    }
-    for label, value in experiences.items():
-        keyboard.add(types.InlineKeyboardButton(label, callback_data=f"experience_{value}"))
-    return keyboard
-def create_employment_menu():
-    keyboard = types.InlineKeyboardMarkup()
-    employments = {
-        "Полная занятость": "Полная занятость",
-        "Частичная занятость": "Частичная занятость",
-        "Проектная работа": "Проектная работа",
-        "Волонтерство": "Волонтерство",
-        "Стажировка": "Стажировка"
-                   }
-    for label, value in employments.items():
-        keyboard.add(types.InlineKeyboardButton(label, callback_data=f"employment_{value}"))
-    return keyboard
 @bot.message_handler(commands=['start'])
 def start(message):
     keyboard = create_main_menu()
     bot.send_message(message.chat.id, "Привет! Я могу помочь вам найти вакансии. Выберите действие:", reply_markup=keyboard)
     user_data[message.chat.id] = {'state': 'START'}
 
-@bot.message_handler(func=lambda message: message.text == "Отмена поиска")
+@bot.message_handler(commands=['cancel'])
 def cancel_search(message):
     user_data.pop(message.chat.id, None)
     keyboard = create_main_menu()
@@ -168,15 +132,7 @@ def handle_salary(message):
     send_experience_buttons(message.chat.id)
 
 def send_experience_buttons(chat_id):
-    keyboard = types.InlineKeyboardMarkup()
-    buttons = [
-        types.InlineKeyboardButton(text="Без опыта", callback_data='noExperience'),
-        types.InlineKeyboardButton(text="1-3 года", callback_data='between1And3'),
-        types.InlineKeyboardButton(text="3-6 лет", callback_data='between3And6'),
-        types.InlineKeyboardButton(text="Более 6 лет", callback_data='moreThan6')
-    ]
-    keyboard.add(*buttons)
-    bot.send_message(chat_id, "Выберите опыт работы:", reply_markup=keyboard)
+    bot.send_message(chat_id, "Выберите опыт работы:", reply_markup=create_experience_menu())
 
 @bot.callback_query_handler(func=lambda call: call.data in ['noExperience', 'between1And3', 'between3And6', 'moreThan6'])
 def handle_experience(call):
@@ -185,16 +141,7 @@ def handle_experience(call):
     send_employment_buttons(call.message.chat.id)
 
 def send_employment_buttons(chat_id):
-    keyboard = types.InlineKeyboardMarkup()
-    buttons = [
-        types.InlineKeyboardButton(text="Полная", callback_data='full'),
-        types.InlineKeyboardButton(text="Частичная", callback_data='part'),
-        types.InlineKeyboardButton(text="Проектная", callback_data='project'),
-        types.InlineKeyboardButton(text="Волонтерство", callback_data='volunteer'),
-        types.InlineKeyboardButton(text="Стажировка", callback_data='probation')
-    ]
-    keyboard.add(*buttons)
-    bot.send_message(chat_id, "Выберите тип занятости:", reply_markup=keyboard)
+    bot.send_message(chat_id, "Выберите тип занятости:", reply_markup=create_employment_menu())
 
 @bot.callback_query_handler(func=lambda call: call.data in ['full', 'part', 'project', 'volunteer', 'probation'])
 def handle_employment(call):

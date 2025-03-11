@@ -1,63 +1,31 @@
-import requests
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import func
 from db import Session, get_db, Vacancy
+from vacancies import search_vacancies, add_vacancy_to_db
 
 app = FastAPI()
 
-def get_area_id_by_name(area_name):
-    url = "https://api.hh.ru/areas"
-    response = requests.get(url)
-    areas = response.json()
-    for country in areas:
-        for area in country['areas']:
-            if area['name'].lower() == area_name.lower():
-                return area['id']
-            for sub_area in area['areas']:
-                if sub_area['name'].lower() == area_name.lower():
-                    return sub_area['id']
-    return None
-
-def search_vacancies(query, area=1, page=0, per_page=20, experience='noExperience',salary=None, employment='full', only_with_salary=True):
-    url = "https://api.hh.ru/vacancies"
-    params = {
-        'text': query,
-        'area': area,  # Регион поиска (1 - Москва)
-        'page': page,
-        'per_page': per_page,
-        'experience': experience,
-        'only_with_salary': only_with_salary,
-        'salary': salary,
-        'employment': employment
-    }
-    response = requests.get(url, params=params)
-    return response.json()
-
-def add_database(vacancy, session):
-    existing_vacancy = session.query(Vacancy).filter_by(id=vacancy['id']).first()
-    if not existing_vacancy:
-        session.add(Vacancy(
-        id= vacancy['id'],
-        name=vacancy['name'],
-        experience=vacancy['experience']['name'],
-        employer=vacancy['employer']['name'],
-        employment=vacancy['employment']['name'],
-        salary=vacancy['salary']['from'] if vacancy['salary']['from'] else vacancy['salary']['to'],
-        area=vacancy['area']['name']
-    ))
-    session.commit()
 @app.get("/search/")
-def search(query: str, area: int = 1, page: int = 0, per_page: int = 20, experience='noExperience', salary=None, employment=None, db: Session = Depends(get_db)):
-    vacancies = search_vacancies(query, area, page, per_page, experience, salary, employment, only_with_salary=True)
-    if vacancies['items']:
-        for vacancy in vacancies['items']:
-            add_database(vacancy, db)
+def search(
+    query: str, area: int = 1, page: int = 0, per_page: int = 20,
+    experience: str = "noExperience", salary: int | None = None,
+    employment: str | None = None, db: Session = Depends(get_db)
+):
+    """Поиск вакансий и сохранение их в базу данных"""
+    vacancies = search_vacancies(query, area, page, per_page, experience, salary, employment)
+    if "items" in vacancies:
+        for vacancy in vacancies["items"]:
+            add_vacancy_to_db(vacancy, db)
         return vacancies
-    else:
-        return {"error": "An error occurred while fetching vacancies"}
+    raise HTTPException(status_code=500, detail="Ошибка при получении вакансий")
+
 
 @app.get("/vacancies/")
-def search_vacancies_by_name(name: str, area: str = None, experience: str = None, employment: str = None, db: Session = Depends(get_db)):
+def get_vacancies(
+        name: str = "", area: str | None = None, experience: str | None = None,
+        employment: str | None = None, db: Session = Depends(get_db)
+):
+    """Получение вакансий из БД с фильтрацией"""
     query = db.query(Vacancy)
     if name:
         query = query.filter(func.lower(Vacancy.name).contains(func.lower(name)))
@@ -69,10 +37,14 @@ def search_vacancies_by_name(name: str, area: str = None, experience: str = None
         query = query.filter(func.lower(Vacancy.employment) == func.lower(employment))
 
     return query.all()
-@app.get("/vacancies/search_by_salary/")
-def get_vacancies(sort_by: str = "salary", order: str = "desc", db: Session = Depends(get_db)):
-    query = db.query(Vacancy).all()
+@app.get("/vacancies/sorted/")
+def get_sorted_vacancies(
+    sort_by: str = "salary", order: str = "desc", db: Session = Depends(get_db)
+):
+    """Сортировка вакансий по зарплате"""
+    vacancies = db.query(Vacancy).all()
     if sort_by == "salary":
-        if order == "asc":
-            return sorted(query, key=lambda x: int(x.salary))
-    return sorted(query, key=lambda x: int(x.salary), reverse=True)
+        return sorted(
+            vacancies, key=lambda x: int(x.salary) if x.salary else 0, reverse=(order == "desc")
+        )
+    return vacancies
